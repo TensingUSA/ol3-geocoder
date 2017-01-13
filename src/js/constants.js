@@ -32,7 +32,8 @@ export const providers = {
   GOOGLE: 'google',
   PHOTON: 'photon',
   BING: 'bing',
-  PELIAS: 'pelias'
+  PELIAS: 'pelias',
+  TENSING: 'tensing'
 };
 
 export const defaultOptions = {
@@ -46,5 +47,6 @@ export const defaultOptions = {
   preventDefault: false,
   autoComplete: false,
   autoCompleteMinLength: 2,
-  debug: false
+  debug: false,
+  tensingProviderURL: ''
 };

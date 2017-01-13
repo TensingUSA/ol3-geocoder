@@ -6,6 +6,7 @@ import { MapQuest } from './providers/mapquest';
 import { Pelias } from './providers/pelias';
 import { Google } from './providers/google';
 import { Bing } from './providers/bing';
+import { Tensing } from './providers/tensing';
 
 const klasses = C.vars.cssClasses;
 
@@ -42,6 +43,9 @@ export class Nominatim {
     this.Pelias = new Pelias();
     this.Google = new Google();
     this.Bing = new Bing();
+    this.Tensing = new Tensing({
+      TensingProviderURL: this.options.tensingProviderURL
+    });
   }
 
   setListeners() {
@@ -95,6 +99,7 @@ export class Nominatim {
 
   query(q) {
     let ajax = {}, options = this.options;
+    let ajaxTeningProvider = {};
     const provider = this.getProvider({
       query: q,
       provider: options.provider,
@@ -102,6 +107,10 @@ export class Nominatim {
       lang: options.lang,
       countrycodes: options.countrycodes,
       limit: options.limit
+    });
+    const providerTensing = this.getProvider({
+      query: q,
+      provider: C.providers.Tensing
     });
     if (this.lastQuery === q && this.els.result.firstChild) return;
     this.lastQuery = q;
@@ -115,6 +124,31 @@ export class Nominatim {
       ajax.data_type = 'jsonp';
       ajax.callbackName = provider.callbackName;
     }
+
+	//Also try to query tensing provider
+    ajaxTeningProvider.url = providerTensing.url;
+    ajaxTeningProvider.data = providerTensing.params;
+    U.json(ajaxTeningProvider).when({
+      ready: res => {
+        // eslint-disable-next-line no-console
+        options.debug && console.info(res);
+        U.removeClass(this.els.reset, klasses.spin);
+
+		//will be fullfiled according to provider
+        let res_ = res.length ? this.Tensing.handleResponse(res) : undefined;
+
+        if (res_) {
+          this.createList(res_);
+          this.listenMapClick();
+        }
+      },
+      error: () => {
+        U.removeClass(this.els.reset, klasses.spin);
+        const li = U.createElement(
+          'li', '<h5>Error! No internet connection?</h5>');
+        this.els.result.appendChild(li);
+      }
+    });
 
     U.json(ajax).when({
       ready: res => {
@@ -269,6 +303,9 @@ export class Nominatim {
         break;
       case C.providers.BING:
         provider = this.Bing.getParameters(options);
+        break;
+      case C.providers.Tensing:
+        provider = this.Tensing.getParameters(options);
         break;
     }
     return provider;

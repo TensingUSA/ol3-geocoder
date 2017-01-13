@@ -2,7 +2,7 @@
  * ol3-geocoder - v2.4.1
  * A geocoder extension for OpenLayers 3.
  * https://github.com/jonataswalker/ol3-geocoder
- * Built: Fri Dec 30 2016 09:33:16 GMT-0200 (BRST)
+ * Built: Fri Jan 13 2017 11:51:28 GMT-0800 (Pacific Standard Time)
  */
 
 (function (global, factory) {
@@ -59,7 +59,8 @@ var providers = {
   GOOGLE: 'google',
   PHOTON: 'photon',
   BING: 'bing',
-  PELIAS: 'pelias'
+  PELIAS: 'pelias',
+  TENSING: 'tensing'
 };
 
 var defaultOptions = {
@@ -73,7 +74,8 @@ var defaultOptions = {
   preventDefault: false,
   autoComplete: false,
   autoCompleteMinLength: 2,
-  debug: false
+  debug: false,
+  tensingProviderURL: ''
 };
 
 /**
@@ -926,6 +928,47 @@ Bing.prototype.handleResponse = function handleResponse (results) {
   }); });
 };
 
+/**
+ * @class Tensing
+ */
+var Tensing = function Tensing(options) {
+
+  this.settings = {
+    url: options.TensingProviderURL,
+    params: {
+      text: ''
+    }
+  };
+};
+
+Tensing.prototype.getParameters = function getParameters (options) {
+  return {
+    url: this.settings.url,
+    params: {
+      text: options.query
+    }
+  };
+};
+
+Tensing.prototype.handleResponse = function handleResponse (results) {
+  return results.map(function (result) { return ({
+    lon: result.Longitude,
+    lat: result.Latitude,
+    address: {
+      name: result.Text || '',
+      road: '',
+      postcode: '',
+      city: '',
+      state: '',
+      country: ''
+    },
+    original: {
+      formatted: result.Text,
+      details: result.Text
+    }
+  }); });
+};
+
 var klasses$1 = vars.cssClasses;
 
 /**
@@ -956,6 +999,9 @@ var Nominatim = function Nominatim(base, els) {
   this.Pelias = new Pelias();
   this.Google = new Google();
   this.Bing = new Bing();
+  this.Tensing = new Tensing({
+    TensingProviderURL: this.options.tensingProviderURL
+  });
 };
 
 Nominatim.prototype.setListeners = function setListeners () {
@@ -1013,6 +1059,7 @@ Nominatim.prototype.query = function query (q) {
     var this$1 = this;
 
   var ajax = {}, options = this.options;
+  var ajaxTeningProvider = {};
   var provider = this.getProvider({
     query: q,
     provider: options.provider,
@@ -1020,6 +1067,10 @@ Nominatim.prototype.query = function query (q) {
     lang: options.lang,
     countrycodes: options.countrycodes,
     limit: options.limit
+  });
+  var providerTensing = this.getProvider({
+    query: q,
+    provider: providers.Tensing
   });
   if (this.lastQuery === q && this.els.result.firstChild) { return; }
   this.lastQuery = q;
@@ -1033,6 +1084,31 @@ Nominatim.prototype.query = function query (q) {
     ajax.data_type = 'jsonp';
     ajax.callbackName = provider.callbackName;
   }
+
+	//Also try to query tensing provider
+  ajaxTeningProvider.url = providerTensing.url;
+  ajaxTeningProvider.data = providerTensing.params;
+  utils.json(ajaxTeningProvider).when({
+    ready: function (res) {
+      // eslint-disable-next-line no-console
+      options.debug && console.info(res);
+      utils.removeClass(this$1.els.reset, klasses$1.spin);
+
+		//will be fullfiled according to provider
+      var res_ = res.length ? this$1.Tensing.handleResponse(res) : undefined;
+
+      if (res_) {
+        this$1.createList(res_);
+        this$1.listenMapClick();
+      }
+    },
+    error: function () {
+      utils.removeClass(this$1.els.reset, klasses$1.spin);
+      var li = utils.createElement(
+        'li', '<h5>Error! No internet connection?</h5>');
+      this$1.els.result.appendChild(li);
+    }
+  });
 
   utils.json(ajax).when({
     ready: function (res) {
@@ -1190,6 +1266,9 @@ Nominatim.prototype.getProvider = function getProvider (options) {
     case providers.BING:
       provider = this.Bing.getParameters(options);
       break;
+    case providers.Tensing:
+      provider = this.Tensing.getParameters(options);
+      break;
   }
   return provider;
 };
@@ -1263,6 +1342,8 @@ var Base = (function (superclass) {
     if (!(this instanceof Base)) { return new Base(); }
 
     utils.assert(typeof type === 'string', '@param `type` should be string!');
+    utils.assert(type === controlType.NOMINATIM || type === controlType.REVERSE,
+        ("@param 'type' should be '" + (controlType.NOMINATIM) + "' or \n        '" + (controlType.REVERSE) + "'!"));
     utils.assert(typeof options === 'object',
         '@param `options` should be object!');
 
