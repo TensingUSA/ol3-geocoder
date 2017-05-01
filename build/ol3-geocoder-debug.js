@@ -1,8 +1,12 @@
 /*!
- * ol3-geocoder - v2.4.1
- * A geocoder extension for OpenLayers 3.
+ * ol3-geocoder - v2.5.0
+ * A geocoder extension for OpenLayers.
  * https://github.com/jonataswalker/ol3-geocoder
+<<<<<<< HEAD
  * Built: Fri Jan 13 2017 11:51:28 GMT-0800 (Pacific Standard Time)
+=======
+ * Built: Tue Feb 21 2017 08:59:29 GMT-0300 (BRT)
+>>>>>>> refs/remotes/jonataswalker/master
  */
 
 (function (global, factory) {
@@ -207,20 +211,9 @@ var utils = {
   flyTo: function flyTo(map, coord, duration, resolution) {
     resolution = resolution || 2.388657133911758;
     duration = duration || 500;
-
     var view = map.getView();
-    var pan = ol.animation.pan({
-      duration: duration,
-      source: view.getCenter()
-    });
-    var zoom = ol.animation.zoom({
-      duration: duration,
-      resolution: view.getResolution()
-    });
-
-    map.beforeRender(pan, zoom);
-    view.setCenter(coord);
-    view.setResolution(resolution);
+    view.animate({ duration: duration, resolution: resolution },
+                 { duration: duration, center: coord });
   },
   randomId: function randomId(prefix) {
     var id = this.now().toString(36);
