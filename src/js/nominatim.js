@@ -99,7 +99,6 @@ export class Nominatim {
 
   query(q) {
     let ajax = {}, options = this.options;
-    let ajaxTeningProvider = {};
     const provider = this.getProvider({
       query: q,
       provider: options.provider,
@@ -107,10 +106,6 @@ export class Nominatim {
       lang: options.lang,
       countrycodes: options.countrycodes,
       limit: options.limit
-    });
-    const providerTensing = this.getProvider({
-      query: q,
-      provider: C.providers.Tensing
     });
     if (this.lastQuery === q && this.els.result.firstChild) return;
     this.lastQuery = q;
@@ -125,30 +120,10 @@ export class Nominatim {
       ajax.callbackName = provider.callbackName;
     }
 
-	//Also try to query tensing provider
-    ajaxTeningProvider.url = providerTensing.url;
-    ajaxTeningProvider.data = providerTensing.params;
-    U.json(ajaxTeningProvider).when({
-      ready: res => {
-        // eslint-disable-next-line no-console
-        options.debug && console.info(res);
-        U.removeClass(this.els.reset, klasses.spin);
-
-		//will be fullfiled according to provider
-        let res_ = res.length ? this.Tensing.handleResponse(res) : undefined;
-
-        if (res_) {
-          this.createList(res_);
-          this.listenMapClick();
-        }
-      },
-      error: () => {
-        U.removeClass(this.els.reset, klasses.spin);
-        const li = U.createElement(
-          'li', '<h5>Error! No internet connection?</h5>');
-        this.els.result.appendChild(li);
-      }
-    });
+    if (options.provider === C.providers.TENSING) {
+      ajax.url = provider.url;
+      ajax.data = provider.params;
+    }
 
     U.json(ajax).when({
       ready: res => {
@@ -183,6 +158,10 @@ export class Nominatim {
               ? this.Bing.handleResponse(res.resourceSets[0].resources)
               : undefined;
             break;
+          case C.providers.TENSING:
+            res_ = res.length ?
+              this.Tensing.handleResponse(res) : undefined;
+            break;
           default:
             // eslint-disable-next-line no-console
             console.log('Unknown provider!');
@@ -204,6 +183,27 @@ export class Nominatim {
 
   createList(response) {
     const ul = this.els.result;
+    response.sort(function (a, b) {
+      let x = a.address.name || '';
+      x += a.address.road || '';
+      x += a.address.postcode || '';
+      x += a.address.city || '';
+      x += a.address.state || '';
+      x += a.address.country || '';
+      x = x.trim();
+      x = x.toLowerCase();
+      let y = b.address.name || '';
+      y += b.address.road || '';
+      y += b.address.postcode || '';
+      y += b.address.city || '';
+      y += b.address.state || '';
+      y += b.address.country || '';
+      y = y.trim();
+      y = y.toLowerCase();
+      if (x < y) {return -1;}
+      if (x > y) {return 1;}
+      return 0;
+    });
     response.forEach(row => {
       let addressHtml = this.addressTemplate(row.address),
           html = ['<a href="#">', addressHtml, '</a>'].join(''),
@@ -304,7 +304,7 @@ export class Nominatim {
       case C.providers.BING:
         provider = this.Bing.getParameters(options);
         break;
-      case C.providers.Tensing:
+      case C.providers.TENSING:
         provider = this.Tensing.getParameters(options);
         break;
     }

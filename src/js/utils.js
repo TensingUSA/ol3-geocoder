@@ -126,8 +126,18 @@ export default {
     resolution = resolution || 2.388657133911758;
     duration = duration || 500;
     const view = map.getView();
-    view.animate({ duration: duration, resolution: resolution },
-                 { duration: duration, center: coord });
+    const pan = ol.animation.pan({
+      duration: duration,
+      source: view.getCenter()
+    });
+    const zoom = ol.animation.zoom({
+      duration: duration,
+      resolution: view.getResolution()
+    });
+
+    map.beforeRender(pan, zoom);
+    view.setCenter(coord);
+    view.setResolution(resolution);
   },
   randomId(prefix) {
     const id = this.now().toString(36);

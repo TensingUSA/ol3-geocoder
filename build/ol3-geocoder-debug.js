@@ -2,11 +2,7 @@
  * ol3-geocoder - v2.5.0
  * A geocoder extension for OpenLayers.
  * https://github.com/jonataswalker/ol3-geocoder
-<<<<<<< HEAD
- * Built: Fri Jan 13 2017 11:51:28 GMT-0800 (Pacific Standard Time)
-=======
- * Built: Tue Feb 21 2017 08:59:29 GMT-0300 (BRT)
->>>>>>> refs/remotes/jonataswalker/master
+ * Built: Tue May 02 2017 12:01:30 GMT-0700 (Pacific Daylight Time)
  */
 
 (function (global, factory) {
@@ -212,8 +208,18 @@ var utils = {
     resolution = resolution || 2.388657133911758;
     duration = duration || 500;
     var view = map.getView();
-    view.animate({ duration: duration, resolution: resolution },
-                 { duration: duration, center: coord });
+    var pan = ol.animation.pan({
+      duration: duration,
+      source: view.getCenter()
+    });
+    var zoom = ol.animation.zoom({
+      duration: duration,
+      resolution: view.getResolution()
+    });
+
+    map.beforeRender(pan, zoom);
+    view.setCenter(coord);
+    view.setResolution(resolution);
   },
   randomId: function randomId(prefix) {
     var id = this.now().toString(36);
@@ -1040,7 +1046,7 @@ Nominatim.prototype.setListeners = function setListeners () {
       }, 200);
     }
   };
-  this.els.input.addEventListener('keyup', query, false);
+  this.els.input.addEventListener('keypress', query, false);
   this.els.input.addEventListener('input', handleValue, false);
   this.els.reset.addEventListener('click', reset, false);
   if (this.options.targetType === targetType.GLASS) {
@@ -1052,7 +1058,6 @@ Nominatim.prototype.query = function query (q) {
     var this$1 = this;
 
   var ajax = {}, options = this.options;
-  var ajaxTeningProvider = {};
   var provider = this.getProvider({
     query: q,
     provider: options.provider,
@@ -1060,10 +1065,6 @@ Nominatim.prototype.query = function query (q) {
     lang: options.lang,
     countrycodes: options.countrycodes,
     limit: options.limit
-  });
-  var providerTensing = this.getProvider({
-    query: q,
-    provider: providers.Tensing
   });
   if (this.lastQuery === q && this.els.result.firstChild) { return; }
   this.lastQuery = q;
@@ -1078,30 +1079,10 @@ Nominatim.prototype.query = function query (q) {
     ajax.callbackName = provider.callbackName;
   }
 
-	//Also try to query tensing provider
-  ajaxTeningProvider.url = providerTensing.url;
-  ajaxTeningProvider.data = providerTensing.params;
-  utils.json(ajaxTeningProvider).when({
-    ready: function (res) {
-      // eslint-disable-next-line no-console
-      options.debug && console.info(res);
-      utils.removeClass(this$1.els.reset, klasses$1.spin);
-
-		//will be fullfiled according to provider
-      var res_ = res.length ? this$1.Tensing.handleResponse(res) : undefined;
-
-      if (res_) {
-        this$1.createList(res_);
-        this$1.listenMapClick();
-      }
-    },
-    error: function () {
-      utils.removeClass(this$1.els.reset, klasses$1.spin);
-      var li = utils.createElement(
-        'li', '<h5>Error! No internet connection?</h5>');
-      this$1.els.result.appendChild(li);
-    }
-  });
+  if (options.provider === providers.TENSING) {
+    ajax.url = provider.url;
+    ajax.data = provider.params;
+  }
 
   utils.json(ajax).when({
     ready: function (res) {
@@ -1136,6 +1117,10 @@ Nominatim.prototype.query = function query (q) {
             ? this$1.Bing.handleResponse(res.resourceSets[0].resources)
             : undefined;
           break;
+        case providers.TENSING:
+          res_ = res.length ?
+            this$1.Tensing.handleResponse(res) : undefined;
+          break;
         default:
           // eslint-disable-next-line no-console
           console.log('Unknown provider!');
@@ -1159,6 +1144,27 @@ Nominatim.prototype.createList = function createList (response) {
     var this$1 = this;
 
   var ul = this.els.result;
+  response.sort(function (a, b) {
+    var x = a.address.name || '';
+    x += a.address.road || '';
+    x += a.address.postcode || '';
+    x += a.address.city || '';
+    x += a.address.state || '';
+    x += a.address.country || '';
+    x = x.trim();
+    x = x.toLowerCase();
+    var y = b.address.name || '';
+    y += b.address.road || '';
+    y += b.address.postcode || '';
+    y += b.address.city || '';
+    y += b.address.state || '';
+    y += b.address.country || '';
+    y = y.trim();
+    y = y.toLowerCase();
+    if (x < y) {return -1;}
+    if (x > y) {return 1;}
+    return 0;
+  });
   response.forEach(function (row) {
     var addressHtml = this$1.addressTemplate(row.address),
         html = ['<a href="#">', addressHtml, '</a>'].join(''),
@@ -1259,7 +1265,7 @@ Nominatim.prototype.getProvider = function getProvider (options) {
     case providers.BING:
       provider = this.Bing.getParameters(options);
       break;
-    case providers.Tensing:
+    case providers.TENSING:
       provider = this.Tensing.getParameters(options);
       break;
   }
