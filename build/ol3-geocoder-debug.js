@@ -2,7 +2,7 @@
  * ol3-geocoder - v2.5.0
  * A geocoder extension for OpenLayers.
  * https://github.com/jonataswalker/ol3-geocoder
- * Built: Tue May 02 2017 12:01:30 GMT-0700 (Pacific Daylight Time)
+ * Built: Fri Jun 30 2017 10:50:47 GMT-0700 (Pacific Daylight Time)
  */
 
 (function (global, factory) {
@@ -1057,7 +1057,7 @@ Nominatim.prototype.setListeners = function setListeners () {
 Nominatim.prototype.query = function query (q) {
     var this$1 = this;
 
-  var ajax = {}, options = this.options;
+  var ajax = {}, options = this.options, searchmultiple = false;
   var provider = this.getProvider({
     query: q,
     provider: options.provider,
@@ -1082,6 +1082,45 @@ Nominatim.prototype.query = function query (q) {
   if (options.provider === providers.TENSING) {
     ajax.url = provider.url;
     ajax.data = provider.params;
+    searchmultiple = true;
+  }
+
+	//Hard code to also search OSM provider when Tensing provider is used
+  if (searchmultiple === true) {
+    var ajaxOSM = {}, osmProvider = this.getProvider({
+          query: q,
+          provider: providers.OSM,
+          key: options.key,
+          lang: options.lang,
+          countrycodes: options.countrycodes,
+          limit: options.limit
+        });
+
+    ajaxOSM.url = document.location.protocol + osmProvider.url;
+    ajaxOSM.data = osmProvider.params;
+
+    utils.json(ajaxOSM).when({
+      ready: function (res) {
+       // eslint-disable-next-line no-console
+        options.debug && console.info(res);
+        utils.removeClass(this$1.els.reset, klasses$1.spin);
+
+        //will be fullfiled according to provider
+        var res_ = res.length ?
+          this$1.OpenStreet.handleResponse(res) : undefined;
+
+        if (res_) {
+          this$1.createList(res_);
+          this$1.listenMapClick();
+        }
+      },
+      error: function () {
+        utils.removeClass(this$1.els.reset, klasses$1.spin);
+        var li = utils.createElement(
+          'li', '<h5>Error! No internet connection?</h5>');
+        this$1.els.result.appendChild(li);
+      }
+    });
   }
 
   utils.json(ajax).when({

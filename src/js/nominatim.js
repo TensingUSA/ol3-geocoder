@@ -98,7 +98,7 @@ export class Nominatim {
   }
 
   query(q) {
-    let ajax = {}, options = this.options;
+    let ajax = {}, options = this.options, searchmultiple = false;
     const provider = this.getProvider({
       query: q,
       provider: options.provider,
@@ -123,6 +123,45 @@ export class Nominatim {
     if (options.provider === C.providers.TENSING) {
       ajax.url = provider.url;
       ajax.data = provider.params;
+      searchmultiple = true;
+    }
+
+	//Hard code to also search OSM provider when Tensing provider is used
+    if (searchmultiple === true) {
+      let ajaxOSM = {}, osmProvider = this.getProvider({
+            query: q,
+            provider: C.providers.OSM,
+            key: options.key,
+            lang: options.lang,
+            countrycodes: options.countrycodes,
+            limit: options.limit
+          });
+
+      ajaxOSM.url = document.location.protocol + osmProvider.url;
+      ajaxOSM.data = osmProvider.params;
+
+      U.json(ajaxOSM).when({
+        ready: res => {
+         // eslint-disable-next-line no-console
+          options.debug && console.info(res);
+          U.removeClass(this.els.reset, klasses.spin);
+
+          //will be fullfiled according to provider
+          let res_ = res.length ?
+            this.OpenStreet.handleResponse(res) : undefined;
+
+          if (res_) {
+            this.createList(res_);
+            this.listenMapClick();
+          }
+        },
+        error: () => {
+          U.removeClass(this.els.reset, klasses.spin);
+          const li = U.createElement(
+            'li', '<h5>Error! No internet connection?</h5>');
+          this.els.result.appendChild(li);
+        }
+      });
     }
 
     U.json(ajax).when({
